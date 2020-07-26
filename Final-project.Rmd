@@ -1,0 +1,110 @@
+---
+title: "Weather events and their consecuences in the US territory"
+author: "Juan J. Alarcon"
+date: "25/7/2020"
+output: 
+      html_document
+---
+
+<!-- Here we first download the file to the project -->
+
+``` {r fileDownload,cache=TRUE,echo=FALSE,results=FALSE}
+
+if(!exists("dataf")){
+      if(!file.exists("stormData.csv.bz2")){
+                  download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",destfile = "stormData.csv.bz2",method = "curl")
+
+      
+      }
+      dataf<-read.csv("stormData.csv.bz2")
+}
+```
+
+
+
+## Sinapsis
+
+In the following document we pursued to find the most harmful meteorological events that took place in the U.S. territory from 1950 to 2011 for both the healthy of the citizens and the economical implications in all the registered states. For this purpose first we identify the top 5 meteorological events with most casualties in these two aspects of interest and analyse the resulting plot for conclusions
+
+## Data Processing
+
+For finding the health impact first we find the events with more injuries
+
+```{r InjurieFinder,cache=TRUE}
+#library(stats)
+
+
+injuresRanking<-aggregate(dataf$INJURIES ~ dataf$EVTYPE,FUN =  sum)
+colnames(injuresRanking)<- c("Event","injuries.sum")
+
+most_relevant_ix<-sort(injuresRanking$injuries.sum,decreasing = TRUE,index.return=TRUE)$ix
+most_relevant<-head(injuresRanking[most_relevant_ix,],n = 10)
+print(most_relevant)
+
+```
+Where can be seen that the top 5 is formed by TORNADO, WSTM WIND, FLOOD, EXCESSIVE HEAT and LIGHTING. Once found the events with more injuries, we can finally plot the most harmful events accross the U.S territory as follows
+
+```{r printing,fig.height=10,cache=TRUE}
+library(ggplot2)
+sorteddf<-aggregate(dataf$INJURIES ~ dataf$EVTYPE + dataf$STATE,FUN = sum)
+
+colnames(sorteddf)<-c("EVTYPE","STATE","injuries.sum")
+finaldf<-sorteddf[sorteddf$EVTYPE %in% most_relevant$Event[1:5],]
+
+p<-ggplot(data=finaldf,aes(x=STATE,y=injuries.sum,fill=factor(EVTYPE)))+geom_bar(position="dodge",stat = "identity")+theme_minimal()+coord_flip()+labs(x="States",y="Total of injuries",fill = "Type of event")
+print(p)
+```
+
+On the other hand, to find the economical consequences, a similar exploration was achieved per Event. Since in the documentation we only find information of estimated costs for thousands, millions and billions regarding the properties, we filter the data as presented
+
+```{r economicalFindings, cache=TRUE}
+
+econRelated <- dataf[dataf$PROPDMGEXP %in% c("K","M","B"),]
+
+econRelated$PROPDMG.USD <- factor(econRelated$PROPDMGEXP,labels=c(1000,1000000,1000000000),levels=c("K","M","B"))
+
+econRelated$PROPDMG.USD <- as.numeric(levels(econRelated$PROPDMG.USD)[econRelated$PROPDMG.USD])
+
+econRelated$PROPDMG.USD <- econRelated$PROPDMG * econRelated$PROPDMG.USD
+
+
+
+
+print(head(econRelated,n = 3))
+
+```
+
+After creating the new column we can find the events with more property damage costs relation in general to finally make an analysis per state.
+
+```{r exploringDamage,cache=TRUE}
+
+resumedf<-aggregate(PROPDMG.USD ~ EVTYPE,data = econRelated,FUN = sum)
+
+economicIndex <- sort(resumedf$PROPDMG.USD,decreasing = TRUE,index.return=TRUE)$ix
+
+resumedf<-resumedf[economicIndex,]
+
+print(head(resumedf,n=5))
+
+```
+
+Finally after identifying the top5 we can finally plot the cost per state of the top 5 events.
+
+
+```{r plotingDamage, fig.height=10, cache=FALSE}
+library(ggplot2)
+plotEcon <- aggregate(PROPDMG.USD ~ EVTYPE + STATE,data = econRelated,FUN=sum)
+
+plotEcon <- plotEcon[plotEcon$EVTYPE %in% resumedf$EVTYPE[1:5],]
+
+
+p1<-ggplot(data=plotEcon,aes(x=STATE,y=PROPDMG.USD,fill=factor(EVTYPE)))+geom_bar(position="dodge",stat = "identity")+theme_minimal()+coord_flip()+labs(x="States",y="Total cost [USD]",fill = "Type of event")
+
+print(p1)
+
+```
+
+## Results
+
+As presented in the Figures above the situation is critical. From the first figure it is possible to find that Tornados are by far the most damaging events that took place in the U.S. territory, followed by Excessive heat in a much smaller scale. And the most affected states were Alaska, Mississippi and Arizona. However, from the second Figure we can distinguish that the event with highest economical impact has always occurred in California and it is Flood. Followed by Hurricane/Typhoon and Storm Surge in the states of Mississippi, Los Angeles and Florida. Therefore we must develop cutting-edge protocols to protect our citizens from tornados and Flood more efficiently and find solutions to decrease the damage of flooding in California.
+
